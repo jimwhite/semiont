@@ -73,9 +73,9 @@ export async function getInferenceClient(inferenceConfig: InferenceServiceConfig
   const clientConfig: InferenceClientConfig = {
     type: inferenceConfig.type as InferenceClientType,
     apiKey: evaluateEnvVar(inferenceConfig.apiKey),
-    model: inferenceConfig.model,
-    endpoint: inferenceConfig.endpoint,
-    baseURL: inferenceConfig.baseURL,
+    model: evaluateEnvVar(inferenceConfig.model) ?? inferenceConfig.model,
+    endpoint: evaluateEnvVar(inferenceConfig.endpoint),
+    baseURL: evaluateEnvVar(inferenceConfig.baseURL),
   };
 
   logger?.info('Loading inference client configuration', {

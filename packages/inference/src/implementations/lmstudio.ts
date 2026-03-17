@@ -73,7 +73,15 @@ export class LMStudioInferenceClient implements InferenceClient {
       throw new Error(`LM Studio API error (${res.status}): ${body}`);
     }
 
-    const data = await res.json() as OpenAIChatResponse;
+    const data = await (async () => {
+      const text = await res.text();
+      try {
+        return JSON.parse(text) as OpenAIChatResponse;
+      } catch {
+        throw new Error(`LM Studio returned invalid JSON. Raw response: ${text.slice(0, 200)}`);
+      }
+    })();
+
     const choice = data.choices?.[0];
 
     if (!choice?.message?.content) {

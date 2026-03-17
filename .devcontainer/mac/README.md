@@ -13,33 +13,42 @@ This directory contains a VS Code Dev Container configuration optimized for **ma
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | ≥ 4.x | Must be running |
 | [VS Code](https://code.visualstudio.com) | Latest | |
 | [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) | Latest | |
-| Ollama **or** LM Studio | Any recent | Running on your Mac |
+| Ollama **or** LM Studio | Any recent | Running on your Mac (or another machine) |
 
 ---
 
 ## Quick Start
 
-### 1. Run the volume setup script (once)
+### 1. Run the setup script (once)
 
 ```bash
 bash scripts/setup-volumes.sh
 ```
 
-This creates the required Docker volumes, local data directories, and a starter `.env` file at `.devcontainer/mac/.env`.
+This checks that Docker is running and copies `.devcontainer/mac/.env.example` → `.devcontainer/mac/.env` for you to edit. Docker Compose will create all required named volumes automatically when the container starts.
 
-### 2. Choose your LLM provider
+### 2. Configure `.devcontainer/mac/.env`
 
-Edit `.devcontainer/mac/.env`:
+#### LLM host
+
+`LLM_HOST` controls where the backend looks for Ollama or LM Studio:
+
+```dotenv
+# Default: Docker Desktop magic hostname → your Mac
+LLM_HOST=host.docker.internal
+
+# VPN / remote machine: use its IP instead
+# LLM_HOST=192.168.1.100
+```
 
 #### Option A – Ollama (default)
 
 ```dotenv
 INFERENCE_TYPE=ollama
-OLLAMA_ENDPOINT=http://host.docker.internal:11434
 OLLAMA_MODEL=llama3.2       # any model you have pulled
 ```
 
-Make sure Ollama is running on your Mac and the model is available:
+Make sure Ollama is running and the model is available:
 
 ```bash
 ollama serve          # start the server (if not already running)
@@ -50,7 +59,6 @@ ollama pull llama3.2  # download the model
 
 ```dotenv
 INFERENCE_TYPE=lmstudio
-LMSTUDIO_ENDPOINT=http://host.docker.internal:1234/v1
 LMSTUDIO_MODEL=local-model  # copy the model ID from LM Studio
 ```
 
@@ -74,20 +82,19 @@ code .   # open the repo in VS Code
 
 Then press **F1** → `Dev Containers: Reopen in Container` → select **Semiont Development (Mac)**.
 
-The container will:
-- Pull the pre-built dev image
-- Start a PostgreSQL container alongside
-- Run `.devcontainer/setup.sh` (installs dependencies, builds packages, provisions services, creates an admin user)
+Docker Compose will automatically start alongside the dev container:
+- **PostgreSQL 18** on port 5432
+- **Neo4j 5** on ports 7474 (Browser) and 7687 (Bolt)
+
+Then `setup.sh` runs to install dependencies, build packages, provision services, and create an admin user.
 
 Estimated first-run time: **5–10 minutes**.
 
 ### 4. Copy the environment config for your LLM
 
-The `setup.sh` script copies `environments/local.json` from the devcontainer defaults. For the Mac-native LLM providers, swap in the right template **inside the container**:
+Inside the container terminal, swap in the environment file that matches your inference provider:
 
 ```bash
-# Inside the container terminal
-
 # For Ollama:
 cp /workspace/.devcontainer/mac/environments-ollama.json \
    /workspace/project/environments/local.json
@@ -97,7 +104,7 @@ cp /workspace/.devcontainer/mac/environments-lmstudio.json \
    /workspace/project/environments/local.json
 ```
 
-Then re-provision the backend so it picks up the new inference config:
+Then re-provision the backend:
 
 ```bash
 semiont provision --service backend --force
@@ -116,31 +123,32 @@ semiont check
 ```
 
 Open **<http://localhost:8080>** in your browser.  
-Login credentials are saved to `/workspace/credentials.json`.
+Login credentials are saved to `/workspace/credentials.json`.  
+Neo4j Browser: **<http://localhost:7474>** (username `neo4j`, password from `NEO4J_LOCAL_PASSWORD` in `.env`).
 
 ---
 
 ## How host LLM access works
 
-Docker Desktop for Mac automatically resolves the hostname `host.docker.internal` to the IP address of your Mac. Both environment configs use this hostname so the backend container can reach Ollama or LM Studio without any extra port-forwarding.
+`LLM_HOST` defaults to `host.docker.internal` – the Docker Desktop magic hostname that resolves to your Mac. You can override it with any IP address:
 
 ```
-┌──────────────────────────────────────┐
-│  Mac host                            │
-│                                      │
-│  Ollama  :11434  ─────────────────┐  │
-│  LM Studio :1234/v1  ─────────┐   │  │
-│                                │   │  │
-│  ┌─────────────────────────┐   │   │  │
-│  │  Docker Desktop         │   │   │  │
-│  │                         │   │   │  │
-│  │  devcontainer  ─────────┼───┘   │  │
-│  │      ↕ host.docker      │       │  │
-│  │      .internal          ├───────┘  │
-│  │                         │          │
-│  │  postgres :5432         │          │
-│  └─────────────────────────┘          │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  Mac host (or VPN-reachable machine)             │
+│                                                  │
+│  Ollama  :11434  ──────────────────┐             │
+│  LM Studio :1234/v1  ──────────┐  │             │
+│                                 │  │             │
+│  ┌──────────────────────────┐   │  │             │
+│  │  Docker Desktop          │   │  │             │
+│  │                          │   │  │             │
+│  │  devcontainer            │   │  │             │
+│  │   LLM_HOST=<host>  ──────┼───┴──┘             │
+│  │                          │                    │
+│  │  postgres  :5432         │                    │
+│  │  neo4j     :7687/:7474   │                    │
+│  └──────────────────────────┘                    │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -187,26 +195,42 @@ npm run build                         # Build all packages
 
 ### `ECONNREFUSED` connecting to Ollama / LM Studio
 
-- Confirm the service is running on your Mac (`ollama ps` or check LM Studio).
+- Confirm the service is running (`ollama ps` or check LM Studio Developer tab).
 - Verify the port: Ollama defaults to **11434**, LM Studio defaults to **1234**.
-- Test from inside the container: `curl http://host.docker.internal:11434/api/tags`
+- Test from inside the container:
+  ```bash
+  curl http://${LLM_HOST}:11434/api/tags   # Ollama
+  curl http://${LLM_HOST}:1234/v1/models   # LM Studio
+  ```
+- If on VPN, set `LLM_HOST` in `.env` to the actual IP of the machine running the LLM.
+
+### Neo4j not ready
+
+Neo4j 5 takes ~30 seconds on first start while it initializes the data directory.  
+The dev container `depends_on` healthcheck will wait for it automatically.
+
+Check status:
+```bash
+docker compose -f .devcontainer/mac/docker-compose.yml ps
+```
+
+Open the Neo4j Browser at **<http://localhost:7474>** (connect with `bolt://localhost:7687`, username `neo4j`, password from `NEO4J_LOCAL_PASSWORD`).
 
 ### Container can't reach PostgreSQL
 
-PostgreSQL runs as a Docker Compose service named `postgres`. The `DATABASE_URL` in the container already points there. If it fails:
+PostgreSQL and Neo4j run as Docker Compose services. The backend `DATABASE_URL` and Neo4j env vars are already wired to the right internal hostnames (`postgres:5432`, `neo4j:7687`).
 
 ```bash
 docker compose -f .devcontainer/mac/docker-compose.yml ps
 ```
 
-### Resetting volumes (start fresh)
+### Resetting to a clean state
 
 ```bash
+# Remove containers and volumes (all local data will be lost)
 docker compose -f .devcontainer/mac/docker-compose.yml down -v
-bash scripts/setup-volumes.sh   # re-create volumes
+# Then reopen the container in VS Code – volumes will be recreated by Compose
 ```
-
-Then reopen the container in VS Code.
 
 ---
 
@@ -215,7 +239,7 @@ Then reopen the container in VS Code.
 | File | Purpose |
 |------|---------|
 | `devcontainer.json` | VS Code Dev Containers configuration |
-| `docker-compose.yml` | Compose file: dev container + PostgreSQL |
+| `docker-compose.yml` | Compose file: dev container + PostgreSQL 18 + Neo4j 5 |
 | `.env.example` | Template – copy to `.env` and edit |
 | `environments-ollama.json` | Semiont env config using Ollama |
 | `environments-lmstudio.json` | Semiont env config using LM Studio |
