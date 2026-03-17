@@ -1,0 +1,89 @@
+{
+  "name": "Semiont Development (Mac)",
+
+  // Use docker-compose so that PostgreSQL starts alongside the dev container
+  // and so that host.docker.internal (Ollama / LM Studio) is reachable.
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "devcontainer",
+
+  "workspaceFolder": "/workspace",
+
+  // Run setup after the container is first created
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "postAttachCommand": "echo 'Semiont (Mac) container ready. Run: semiont start'",
+
+  // Forward the key service ports so VS Code opens them automatically
+  "forwardPorts": [8080, 3000, 4000, 9901, 5432],
+
+  "portsAttributes": {
+    "8080": {
+      "label": "Envoy Proxy (Main Entry Point)",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Frontend (Direct)",
+      "onAutoForward": "silent"
+    },
+    "4000": {
+      "label": "Backend (Direct)",
+      "onAutoForward": "silent"
+    },
+    "9901": {
+      "label": "Envoy Admin",
+      "onAutoForward": "silent"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "containerEnv": {
+    "SEMIONT_ENV": "local",
+    "SEMIONT_ROOT": "/workspace/project",
+    "SEMIONT_REPO": "/workspace",
+    "NODE_ENV": "development"
+  },
+
+  "remoteEnv": {
+    "SEMIONT_ENV": "local",
+    "SEMIONT_ROOT": "/workspace/project",
+    "SEMIONT_REPO": "/workspace",
+    "NODE_ENV": "development"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "Prisma.prisma",
+        "bradlc.vscode-tailwindcss",
+        "streetsidesoftware.code-spell-checker",
+        "christian-kohler.npm-intellisense",
+        "christian-kohler.path-intellisense",
+        "formulahendry.auto-rename-tag",
+        "yoavbls.pretty-ts-errors",
+        "usernamehw.errorlens"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.cwd": "/workspace",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": true
+        },
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "npm.autoDetect": "on",
+        "npm.packageManager": "npm",
+        "workbench.startupEditor": "none"
+      }
+    }
+  },
+
+  "remoteUser": "node"
+}

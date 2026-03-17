@@ -4,8 +4,9 @@ import type { InferenceServiceConfig, Logger } from '@semiont/core';
 import { InferenceClient } from './interface.js';
 import { AnthropicInferenceClient } from './implementations/anthropic.js';
 import { OllamaInferenceClient } from './implementations/ollama.js';
+import { LMStudioInferenceClient } from './implementations/lmstudio.js';
 
-export type InferenceClientType = 'anthropic' | 'ollama';
+export type InferenceClientType = 'anthropic' | 'ollama' | 'lmstudio';
 
 export interface InferenceClientConfig {
   type: InferenceClientType;
@@ -31,6 +32,14 @@ export function createInferenceClient(config: InferenceClientConfig, logger?: Lo
 
     case 'ollama': {
       return new OllamaInferenceClient(
+        config.model,
+        config.endpoint || config.baseURL,
+        logger
+      );
+    }
+
+    case 'lmstudio': {
+      return new LMStudioInferenceClient(
         config.model,
         config.endpoint || config.baseURL,
         logger

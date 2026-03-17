@@ -1,0 +1,88 @@
+{
+  "name": "local",
+  "platform": {
+    "default": "container"
+  },
+  "deployment": {
+    "imageTagStrategy": "mutable"
+  },
+  "site": {
+    "domain": "localhost:3000"
+  },
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "logLevel": "debug",
+  "services": {
+    "backend": {
+      "platform": {
+        "type": "posix"
+      },
+      "devMode": true,
+      "port": 4000,
+      "publicURL": "http://localhost:4000",
+      "corsOrigin": "http://localhost:3000"
+    },
+    "frontend": {
+      "platform": {
+        "type": "posix"
+      },
+      "devMode": true,
+      "port": 3000,
+      "publicURL": "http://localhost:3000",
+      "siteName": "Semiont"
+    },
+    "database": {
+      "platform": {
+        "type": "external"
+      },
+      "type": "postgres",
+      "name": "postgres",
+      "host": "postgres",
+      "port": 5432,
+      "environment": {
+        "POSTGRES_DB": "semiont",
+        "POSTGRES_USER": "semiont",
+        "POSTGRES_PASSWORD": "semiont_dev"
+      },
+      "description": "PostgreSQL running in a Docker Compose service named 'postgres'"
+    },
+    "graph": {
+      "platform": {
+        "type": "external"
+      },
+      "type": "neo4j",
+      "name": "neo4j",
+      "uri": "${NEO4J_URI}",
+      "username": "${NEO4J_USERNAME}",
+      "password": "${NEO4J_PASSWORD}",
+      "database": "${NEO4J_DATABASE}"
+    },
+    "filesystem": {
+      "platform": {
+        "type": "posix"
+      },
+      "path": "./data/uploads",
+      "description": "Local filesystem storage for uploads and assets"
+    },
+    "inference": {
+      "platform": {
+        "type": "external"
+      },
+      "type": "lmstudio",
+      "model": "local-model",
+      "endpoint": "http://host.docker.internal:1234/v1",
+      "description": "LM Studio running natively on the Mac host (accessible via host.docker.internal). Start the LM Studio server and load a model before starting the container. Replace 'local-model' with the model identifier shown in LM Studio."
+    },
+    "proxy": {
+      "platform": {
+        "type": "posix"
+      },
+      "type": "envoy",
+      "port": 8080,
+      "adminPort": 9901,
+      "backendPort": 4000,
+      "frontendPort": 3000
+    }
+  }
+}
