@@ -58,14 +58,17 @@
     "SEMIONT_ENV": "local",
     "SEMIONT_ROOT": "/workspace/project",
     "SEMIONT_REPO": "/workspace",
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    // PostgreSQL runs as a separate Docker Compose service named "postgres"
+    "POSTGRES_HOST": "postgres"
   },
 
   "remoteEnv": {
     "SEMIONT_ENV": "local",
     "SEMIONT_ROOT": "/workspace/project",
     "SEMIONT_REPO": "/workspace",
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "POSTGRES_HOST": "postgres"
   },
 
   "customizations": {

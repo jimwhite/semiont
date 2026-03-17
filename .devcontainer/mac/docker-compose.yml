@@ -43,6 +43,10 @@ services:
       NODE_ENV: development
 
       # ── PostgreSQL ────────────────────────────────────────────────────
+      # These are read by the Semiont CLI when building the DATABASE_URL
+      # from environments/local.json (via ${POSTGRES_HOST} / ${POSTGRES_PASSWORD}).
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-semiont_dev}
       DATABASE_URL: postgresql://semiont:${POSTGRES_PASSWORD:-semiont_dev}@postgres:5432/semiont?schema=public
 
       # ── Neo4j graph database (local container) ────────────────────────
