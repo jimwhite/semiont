@@ -170,7 +170,7 @@ docker run -d \
 ```yaml
 services:
   database:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: semiont
       POSTGRES_USER: semiont
@@ -217,7 +217,7 @@ volumes:
 ```yaml
 services:
   database:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: semiont
       POSTGRES_USER: semiont

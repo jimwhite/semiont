@@ -78,7 +78,7 @@ export class LMStudioInferenceClient implements InferenceClient {
       try {
         return JSON.parse(text) as OpenAIChatResponse;
       } catch {
-        throw new Error(`LM Studio returned invalid JSON. Raw response: ${text.slice(0, 200)}`);
+        throw new Error(`LM Studio returned invalid JSON response (expected chat completion format). Raw response: ${text.slice(0, 200)}`);
       }
     })();
 

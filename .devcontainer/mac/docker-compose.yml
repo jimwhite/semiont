@@ -20,7 +20,12 @@ services:
   # Dev Container – the actual VS Code development environment
   # -----------------------------------------------------------------------
   devcontainer:
-    image: ghcr.io/the-ai-alliance/semiont/devcontainer:latest
+    # Build locally from the Mac-specific Dockerfile so that Docker Desktop
+    # automatically targets the native architecture (arm64 on Apple Silicon,
+    # amd64 on Intel).  No prebuilt image is pulled from a registry.
+    build:
+      context: ../..
+      dockerfile: .devcontainer/mac/Dockerfile
     # Keep the container alive so VS Code can attach
     command: sleep infinity
     volumes:
