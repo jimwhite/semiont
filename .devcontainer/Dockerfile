@@ -4,8 +4,8 @@ FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
 
 USER root
 
-# Install PostgreSQL 16
-# Add PostgreSQL APT repository for version 16
+# Install PostgreSQL 18
+# Add PostgreSQL APT repository for version 18
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -14,7 +14,7 @@ RUN apt-get update && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     apt-get update && \
-    apt-get install -y postgresql-16 postgresql-contrib-16 && \
+    apt-get install -y postgresql-18 postgresql-contrib-18 && \
     rm -rf /var/lib/apt/lists/*
 
 # Configure PostgreSQL
@@ -28,7 +28,7 @@ RUN mkdir -p /var/lib/postgresql/data && \
     chmod 700 /var/lib/postgresql/data
 
 # Initialize PostgreSQL database cluster as postgres user
-RUN su - postgres -c "/usr/lib/postgresql/16/bin/initdb -D /var/lib/postgresql/data"
+RUN su - postgres -c "/usr/lib/postgresql/18/bin/initdb -D /var/lib/postgresql/data"
 
 # Configure PostgreSQL to listen on localhost
 RUN echo "listen_addresses = 'localhost'" >> /var/lib/postgresql/data/postgresql.conf && \

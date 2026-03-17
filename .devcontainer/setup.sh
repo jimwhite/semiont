@@ -133,9 +133,21 @@ print_success "Node $(node --version), npm $(npm --version)"
 # Install Envoy if not already installed
 print_status "Installing Envoy proxy..."
 if ! command -v envoy &> /dev/null; then
-    # Download and install Envoy binary for Linux x86_64
     ENVOY_VERSION="1.28.0"
-    ENVOY_URL="https://github.com/envoyproxy/envoy/releases/download/v${ENVOY_VERSION}/envoy-${ENVOY_VERSION}-linux-x86_64"
+
+    # Detect CPU architecture and map to the Envoy release filename convention
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)   ENVOY_ARCH="x86_64" ;;
+        aarch64)  ENVOY_ARCH="aarch_64" ;;  # Envoy uses aarch_64, not arm64
+        arm64)    ENVOY_ARCH="aarch_64" ;;
+        *)
+            print_error "Unsupported architecture for Envoy: $ARCH"
+            exit 1
+            ;;
+    esac
+
+    ENVOY_URL="https://github.com/envoyproxy/envoy/releases/download/v${ENVOY_VERSION}/envoy-${ENVOY_VERSION}-linux-${ENVOY_ARCH}"
 
     curl -L -o /tmp/envoy "$ENVOY_URL" >> $LOG_FILE 2>&1 || {
         print_error "Failed to download Envoy - check $LOG_FILE"
@@ -250,11 +262,22 @@ print_status "Waiting for PostgreSQL..."
 max_attempts=30
 attempt=0
 
+# Derive host/port from DATABASE_URL when running in Docker Compose
+# (where postgres is a named service, not localhost).
+# DATABASE_URL format: postgresql://user:pass@host:port/db
+if [ -n "${DATABASE_URL:-}" ]; then
+    PG_HOST=$(node -e "const u = new URL(process.env.DATABASE_URL); process.stdout.write(u.hostname)" 2>/dev/null || echo "localhost")
+    PG_PORT=$(node -e "const u = new URL(process.env.DATABASE_URL); process.stdout.write(u.port || '5432')" 2>/dev/null || echo "5432")
+else
+    PG_HOST="localhost"
+    PG_PORT="5432"
+fi
+
 # Try to connect to PostgreSQL using Node.js since pg_isready might not be available
 while ! node -e "
 const net = require('net');
 const client = new net.Socket();
-client.connect(5432, 'localhost', function() {
+client.connect(${PG_PORT}, '${PG_HOST}', function() {
     client.destroy();
     process.exit(0);
 });

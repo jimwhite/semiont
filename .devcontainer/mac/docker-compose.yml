@@ -1,0 +1,163 @@
+# Docker Compose for Semiont Mac Development
+#
+# Designed for macOS with Docker Desktop, where Ollama or LM Studio runs
+# natively on the host. Containers reach host services via the magic DNS name
+# `host.docker.internal` that Docker Desktop automatically resolves, OR via a
+# custom IP address set with the LLM_HOST variable (useful when on VPN).
+#
+# Usage:
+#   cp .devcontainer/mac/.env.example .devcontainer/mac/.env
+#   # Edit .env – choose INFERENCE_TYPE=ollama or INFERENCE_TYPE=lmstudio
+#   # Then open the repo in VS Code → "Reopen in Container"
+#
+# To start manually without VS Code:
+#   docker compose -f .devcontainer/mac/docker-compose.yml --env-file .devcontainer/mac/.env up -d
+
+version: '3.9'
+
+services:
+  # -----------------------------------------------------------------------
+  # Dev Container – the actual VS Code development environment
+  # -----------------------------------------------------------------------
+  devcontainer:
+    # Build locally from the Mac-specific Dockerfile so that Docker Desktop
+    # automatically targets the native architecture (arm64 on Apple Silicon,
+    # amd64 on Intel).  No prebuilt image is pulled from a registry.
+    build:
+      context: ../..
+      dockerfile: .devcontainer/mac/Dockerfile
+    # Keep the container alive so VS Code can attach
+    command: sleep infinity
+    volumes:
+      # Mount repo root into /workspace (cached for macOS performance)
+      - ../..:/workspace:cached
+      # Separate node_modules volume so host and container don't conflict
+      - node_modules:/workspace/node_modules
+      # Persist the Semiont project workspace across container rebuilds
+      - semiont_project:/workspace/project
+    environment:
+      # ── Semiont runtime ──────────────────────────────────────────────
+      SEMIONT_ENV: local
+      SEMIONT_ROOT: /workspace/project
+      SEMIONT_REPO: /workspace
+      NODE_ENV: development
+
+      # ── PostgreSQL ────────────────────────────────────────────────────
+      # These are read by the Semiont CLI when building the DATABASE_URL
+      # from environments/local.json (via ${POSTGRES_HOST} / ${POSTGRES_PASSWORD}).
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-semiont_dev}
+      DATABASE_URL: postgresql://semiont:${POSTGRES_PASSWORD:-semiont_dev}@postgres:5432/semiont?schema=public
+
+      # ── Neo4j graph database (local container) ────────────────────────
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_LOCAL_PASSWORD:-semiont_dev}
+      NEO4J_DATABASE: neo4j
+
+      # ── Inference – choose 'ollama' or 'lmstudio' ────────────────────
+      # Set INFERENCE_TYPE in your .env file
+      INFERENCE_TYPE: ${INFERENCE_TYPE:-ollama}
+
+      # LLM_HOST is the hostname/IP where Ollama or LM Studio is running.
+      # Defaults to host.docker.internal (your Mac). Override if the LLM
+      # server is on a different machine (e.g. a separate box on VPN).
+      LLM_HOST: ${LLM_HOST:-host.docker.internal}
+
+      # Ollama endpoint – derived from LLM_HOST unless overridden directly
+      OLLAMA_ENDPOINT: http://${LLM_HOST}:11434
+      # Ollama model to use (e.g. llama3.2, mistral, codellama)
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+
+      # LM Studio endpoint – derived from LLM_HOST unless overridden directly
+      LMSTUDIO_ENDPOINT: http://${LLM_HOST}:1234/v1
+      # LM Studio model identifier (must match what you have loaded in LM Studio)
+      LMSTUDIO_MODEL: ${LMSTUDIO_MODEL:-local-model}
+
+      # ── Optional: Anthropic (cloud fallback) ─────────────────────────
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks:
+      - semiont
+
+  # -----------------------------------------------------------------------
+  # PostgreSQL 18 – user authentication database
+  # -----------------------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: semiont
+      POSTGRES_USER: semiont
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-semiont_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Expose on 127.0.0.1 only so it is reachable from host tools
+      # (e.g. TablePlus, psql) without being exposed to the network
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U semiont -d semiont"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - semiont
+
+  # -----------------------------------------------------------------------
+  # Neo4j 5 – knowledge graph database
+  # -----------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5
+    restart: unless-stopped
+    environment:
+      # neo4j/<password> format; must match NEO4J_LOCAL_PASSWORD in .env
+      NEO4J_AUTH: neo4j/${NEO4J_LOCAL_PASSWORD:-semiont_dev}
+      # Increase heap for development workloads
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1g
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      # Neo4j Browser (HTTP)
+      - "127.0.0.1:7474:7474"
+      # Bolt protocol (used by the application)
+      - "127.0.0.1:7687:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
+    networks:
+      - semiont
+
+networks:
+  semiont:
+    driver: bridge
+
+volumes:
+  # Persistent PostgreSQL data
+  postgres_data:
+    name: semiont_postgres_data
+
+  # Persistent Neo4j graph data
+  neo4j_data:
+    name: semiont_neo4j_data
+
+  # Neo4j log files
+  neo4j_logs:
+    name: semiont_neo4j_logs
+
+  # node_modules isolated from the macOS host to avoid binary incompatibilities
+  node_modules:
+    name: semiont_node_modules
+
+  # Semiont project workspace (init/provision artefacts, credentials, etc.)
+  semiont_project:
+    name: semiont_project
